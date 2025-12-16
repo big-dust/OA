@@ -48,9 +48,12 @@ export default function PrivateRoute({ children, allowedRoles = [] }: PrivateRou
   }
 
   // 检查角色权限
-  if (allowedRoles.length > 0 && !hasPermission(employee.role, allowedRoles)) {
-    // 无权限访问，重定向到仪表盘
-    return <Navigate to="/dashboard" replace />;
+  if (allowedRoles.length > 0) {
+    const userRole = employee.role;
+    if (!userRole || !hasPermission(userRole, allowedRoles)) {
+      // 无权限访问，重定向到仪表盘
+      return <Navigate to="/dashboard" replace />;
+    }
   }
 
   return <>{children}</>;

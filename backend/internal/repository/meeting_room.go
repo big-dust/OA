@@ -115,8 +115,10 @@ func (r *MeetingRoomBookingRepository) GetByEmployeeID(employeeID uint) ([]model
 // Implements Requirement 8.4: Employee views meeting room availability
 func (r *MeetingRoomBookingRepository) GetByMeetingRoomAndDate(roomID uint, date time.Time) ([]model.MeetingRoomBooking, error) {
 	var bookings []model.MeetingRoomBooking
+	// 使用日期字符串比较，避免时区问题
+	dateStr := date.Format("2006-01-02")
 	err := r.db.Preload("Employee").
-		Where("meeting_room_id = ? AND booking_date = ? AND status = ?", roomID, date, model.BookingStatusActive).
+		Where("meeting_room_id = ? AND DATE(booking_date) = ? AND status = ?", roomID, dateStr, model.BookingStatusActive).
 		Order("start_time ASC").
 		Find(&bookings).Error
 	return bookings, err
@@ -142,10 +144,12 @@ func (r *MeetingRoomBookingRepository) HasActiveBooking(employeeID uint) (bool, 
 // Implements Requirement 8.5, 8.6: Check booking conflicts
 func (r *MeetingRoomBookingRepository) HasConflict(roomID uint, date time.Time, startTime, endTime string) (bool, *model.MeetingRoomBooking, error) {
 	var booking model.MeetingRoomBooking
+	// 使用日期字符串比较，避免时区问题
+	dateStr := date.Format("2006-01-02")
 	// Check for overlapping bookings:
 	// Conflict exists if: existing.start < new.end AND existing.end > new.start
 	err := r.db.Preload("Employee").
-		Where("meeting_room_id = ? AND booking_date = ? AND status = ?", roomID, date, model.BookingStatusActive).
+		Where("meeting_room_id = ? AND DATE(booking_date) = ? AND status = ?", roomID, dateStr, model.BookingStatusActive).
 		Where("start_time < ? AND end_time > ?", endTime, startTime).
 		First(&booking).Error
 	

@@ -35,9 +35,10 @@ export default function DeviceList() {
   const fetchDevices = useCallback(async () => {
     try {
       const data = await deviceService.getList();
-      setDevices(data);
+      setDevices(data || []);
     } catch {
       toast.error('获取设备列表失败');
+      setDevices([]);
     }
   }, []);
 

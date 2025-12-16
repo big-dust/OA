@@ -207,6 +207,9 @@ func (s *MeetingRoomService) CreateBooking(employeeID uint, req *CreateBookingRe
 		return nil, nil, errors.New("start time must be before end time")
 	}
 
+	// 先自动完成过期的预定
+	s.autoCompleteExpiredBookings(employeeID)
+	
 	// Property 13: Check if employee already has an active booking
 	hasActive, err := s.bookingRepo.HasActiveBooking(employeeID)
 	if err != nil {
@@ -266,7 +269,23 @@ func (s *MeetingRoomService) GetBookingByID(id uint) (*model.MeetingRoomBooking,
 // GetMyBookings retrieves all bookings for an employee
 // Implements Requirement 8.10: Employee views their bookings
 func (s *MeetingRoomService) GetMyBookings(employeeID uint) ([]model.MeetingRoomBooking, error) {
+	// 先自动完成过期的预定
+	s.autoCompleteExpiredBookings(employeeID)
 	return s.bookingRepo.GetByEmployeeID(employeeID)
+}
+
+// autoCompleteExpiredBookings automatically completes expired active bookings for an employee
+func (s *MeetingRoomService) autoCompleteExpiredBookings(employeeID uint) {
+	now := time.Now()
+	currentDate := now.Format("2006-01-02")
+	currentTime := now.Format("15:04:05")
+	
+	// 更新所有过期的活跃预定为已完成
+	// 条件：状态为active，且（预定日期 < 今天）或（预定日期 = 今天 且 结束时间 <= 当前时间）
+	s.db.Model(&model.MeetingRoomBooking{}).
+		Where("employee_id = ? AND status = ?", employeeID, model.BookingStatusActive).
+		Where("(DATE(booking_date) < ? OR (DATE(booking_date) = ? AND end_time <= ?))", currentDate, currentDate, currentTime).
+		Update("status", model.BookingStatusCompleted)
 }
 
 // CompleteBooking marks a booking as completed

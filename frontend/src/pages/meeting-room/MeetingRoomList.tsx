@@ -33,9 +33,10 @@ export default function MeetingRoomList() {
   const fetchMeetingRooms = useCallback(async () => {
     try {
       const data = await meetingRoomService.getList();
-      setMeetingRooms(data);
+      setMeetingRooms(data || []);
     } catch {
       toast.error('获取会议室列表失败');
+      setMeetingRooms([]);
     }
   }, []);
 

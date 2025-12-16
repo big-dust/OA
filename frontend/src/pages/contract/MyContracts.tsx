@@ -48,6 +48,39 @@ function formatDateTime(dateStr: string | null): string {
   });
 }
 
+// 格式化日期为 YYYY-MM-DD
+function formatDate(dateStr: string | null): string {
+  if (!dateStr) return '-';
+  const date = new Date(dateStr);
+  return date.toLocaleDateString('zh-CN', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  });
+}
+
+// 替换合同内容中的占位符
+function replaceContractPlaceholders(contract: Contract): string {
+  let content = contract.content;
+  const employee = contract.employee;
+  
+  if (employee) {
+    content = content.replace(/\{\{employee_name\}\}/g, employee.name || '');
+    content = content.replace(/\{\{employee_no\}\}/g, employee.employee_no || '');
+    content = content.replace(/\{\{department\}\}/g, employee.department || '');
+    content = content.replace(/\{\{position\}\}/g, employee.position || '');
+    content = content.replace(/\{\{hire_date\}\}/g, formatDate(employee.hire_date));
+    content = content.replace(/\{\{start_date\}\}/g, formatDate(employee.hire_date));
+  }
+  
+  // 替换当前日期和结束日期
+  const today = formatDate(new Date().toISOString());
+  content = content.replace(/\{\{current_date\}\}/g, today);
+  content = content.replace(/\{\{end_date\}\}/g, today);
+  
+  return content;
+}
+
 export default function MyContracts() {
   const [contracts, setContracts] = useState<Contract[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -60,9 +93,10 @@ export default function MyContracts() {
   const fetchContracts = useCallback(async () => {
     try {
       const data = await contractService.getMy();
-      setContracts(data);
+      setContracts(data || []);
     } catch {
       toast.error('获取合同列表失败');
+      setContracts([]);
     }
   }, []);
 
@@ -219,7 +253,7 @@ export default function MyContracts() {
               <div className="border-t pt-4">
                 <h4 className="font-medium mb-2">合同内容</h4>
                 <div className="bg-muted p-4 rounded-md whitespace-pre-wrap text-sm">
-                  {selectedContract.content}
+                  {replaceContractPlaceholders(selectedContract)}
                 </div>
               </div>
             </div>
@@ -245,7 +279,7 @@ export default function MyContracts() {
               <div className="border rounded-md p-4 max-h-64 overflow-y-auto">
                 <h4 className="font-medium mb-2 text-sm">合同内容</h4>
                 <div className="whitespace-pre-wrap text-sm text-muted-foreground">
-                  {selectedContract.content}
+                  {replaceContractPlaceholders(selectedContract)}
                 </div>
               </div>
               <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 text-sm text-yellow-800">

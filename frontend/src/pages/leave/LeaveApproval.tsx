@@ -50,9 +50,10 @@ export default function LeaveApproval() {
   const fetchPendingLeaves = useCallback(async () => {
     try {
       const data = await leaveService.getPending();
-      setPendingLeaves(data);
+      setPendingLeaves(data || []);
     } catch {
       toast.error('获取待审批申请失败');
+      setPendingLeaves([]);
     }
   }, []);
 

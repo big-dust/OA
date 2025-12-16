@@ -60,9 +60,10 @@ export default function SalaryList() {
   const fetchEmployees = useCallback(async () => {
     try {
       const data = await employeeService.getList();
-      setEmployees(data);
+      setEmployees(data || []);
     } catch {
       toast.error('获取员工列表失败');
+      setEmployees([]);
     }
   }, []);
 
@@ -77,9 +78,10 @@ export default function SalaryList() {
         filter.month = filterMonth;
       }
       const data = await salaryService.getList(filter);
-      setSalaries(data);
+      setSalaries(data || []);
     } catch {
       toast.error('获取工资列表失败');
+      setSalaries([]);
     }
   }, [filterEmployeeId, filterMonth]);
 

@@ -46,9 +46,10 @@ export default function SalaryForm() {
     const fetchEmployees = async () => {
       try {
         const data = await employeeService.getList();
-        setEmployees(data);
+        setEmployees(data || []);
       } catch {
         toast.error('获取员工列表失败');
+        setEmployees([]);
       } finally {
         setIsLoading(false);
       }

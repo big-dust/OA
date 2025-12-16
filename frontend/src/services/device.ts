@@ -4,14 +4,14 @@ import type { Device, DeviceRequest } from '@/types';
 export interface CreateDeviceRequest {
   name: string;
   type: string;
-  total_quantity: number;
+  quantity: number;
   description: string;
 }
 
 export interface UpdateDeviceRequest {
   name?: string;
   type?: string;
-  total_quantity?: number;
+  quantity?: number;
   description?: string;
 }
 

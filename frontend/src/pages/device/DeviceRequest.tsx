@@ -64,9 +64,10 @@ export default function DeviceRequestPage() {
   const fetchRequests = useCallback(async () => {
     try {
       const data = await deviceRequestService.getList();
-      setRequests(data);
+      setRequests(data || []);
     } catch {
       toast.error('获取设备申请记录失败');
+      setRequests([]);
     }
   }, []);
 

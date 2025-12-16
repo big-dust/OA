@@ -1,12 +1,17 @@
 import { useState, useEffect, useCallback } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
 import { toast } from 'sonner';
-import { ArrowLeft, Calendar, Clock, Check, X } from 'lucide-react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { ArrowLeft, Calendar, Plus } from 'lucide-react';
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Badge } from '@/components/ui/badge';
 import {
   Dialog,
   DialogContent,
@@ -15,8 +20,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
-import { meetingRoomService, meetingRoomBookingService, type TimeSlot } from '@/services/meetingRoom';
-import type { MeetingRoom } from '@/types';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  meetingRoomService,
+  meetingRoomBookingService,
+} from '@/services/meetingRoom';
+import type { MeetingRoom, MeetingRoomBooking } from '@/types';
 
 // 格式化日期为 YYYY-MM-DD
 function formatDate(date: Date): string {
@@ -28,32 +43,179 @@ function formatTime(time: string): string {
   return time.substring(0, 5);
 }
 
-// 生成时间段选项（每小时一个时间段，从 8:00 到 20:00）
-function generateTimeSlots(): { start: string; end: string }[] {
-  const slots: { start: string; end: string }[] = [];
-  for (let hour = 8; hour < 20; hour++) {
-    const start = `${hour.toString().padStart(2, '0')}:00:00`;
-    const end = `${(hour + 1).toString().padStart(2, '0')}:00:00`;
-    slots.push({ start, end });
-  }
-  return slots;
+// 获取当前时间字符串 HH:MM:SS
+function getCurrentTime(): string {
+  const now = new Date();
+  return `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:00`;
 }
+
+// 生成24小时时间选项（每30分钟一个）
+function generateTimeOptions(): string[] {
+  const options: string[] = [];
+  for (let hour = 0; hour < 24; hour++) {
+    options.push(`${hour.toString().padStart(2, '0')}:00:00`);
+    options.push(`${hour.toString().padStart(2, '0')}:30:00`);
+  }
+  options.push('24:00:00'); // 添加24:00作为结束时间选项
+  return options;
+}
+
+// 检查时间是否与已有预定冲突
+function checkTimeConflict(
+  startTime: string,
+  endTime: string,
+  bookings: MeetingRoomBooking[]
+): MeetingRoomBooking | undefined {
+  return bookings.find((b) => {
+    if (b.status !== 'active') return false;
+    return b.start_time < endTime && b.end_time > startTime;
+  });
+}
+
+// 检查某个时间点是否被预定覆盖
+function isTimeBooked(time: string, bookings: MeetingRoomBooking[]): boolean {
+  return bookings.some((b) => {
+    if (b.status !== 'active') return false;
+    return b.start_time <= time && b.end_time > time;
+  });
+}
+
+// 检查时间是否已过（仅当天需要检查）
+function isTimePassed(time: string, selectedDate: string): boolean {
+  const today = formatDate(new Date());
+  if (selectedDate !== today) return false;
+  return time <= getCurrentTime();
+}
+
+// 时间转换为小时数（用于计算位置）
+function timeToHours(time: string): number {
+  const [hours, minutes] = time.split(':').map(Number);
+  return hours + minutes / 60;
+}
+
+// 时间轴组件
+function TimelineBar({
+  bookings,
+  selectedDate,
+}: {
+  bookings: MeetingRoomBooking[];
+  selectedDate: string;
+}) {
+  const today = formatDate(new Date());
+  const isToday = selectedDate === today;
+  const currentHours = isToday ? timeToHours(getCurrentTime()) : 0;
+
+  return (
+    <div className="space-y-2">
+      {/* 时间刻度 */}
+      <div className="relative h-6 flex">
+        {Array.from({ length: 25 }, (_, i) => (
+          <div
+            key={i}
+            className="flex-1 text-xs text-muted-foreground text-center"
+            style={{ minWidth: '0' }}
+          >
+            {i % 3 === 0 ? `${i.toString().padStart(2, '0')}:00` : ''}
+          </div>
+        ))}
+      </div>
+
+      {/* 时间轴条 */}
+      <div className="relative h-12 bg-green-50 rounded-lg overflow-hidden border border-green-200">
+        {/* 已过时间（灰色） */}
+        {isToday && currentHours > 0 && (
+          <div
+            className="absolute top-0 bottom-0 bg-gray-300"
+            style={{
+              left: '0%',
+              width: `${(currentHours / 24) * 100}%`,
+            }}
+          />
+        )}
+
+        {/* 已预定时间段（橙色表示繁忙） */}
+        {bookings
+          .filter((b) => b.status === 'active')
+          .map((booking, index) => {
+            const startHours = timeToHours(booking.start_time);
+            const endHours = timeToHours(booking.end_time);
+            const left = (startHours / 24) * 100;
+            const width = ((endHours - startHours) / 24) * 100;
+
+            return (
+              <div
+                key={index}
+                className="absolute top-1 bottom-1 bg-orange-400 rounded flex items-center justify-center text-white text-xs font-medium overflow-hidden"
+                style={{
+                  left: `${left}%`,
+                  width: `${width}%`,
+                }}
+                title={`繁忙: ${formatTime(booking.start_time)} - ${formatTime(booking.end_time)}`}
+              >
+                {width > 8 && (
+                  <span className="truncate px-1">
+                    {formatTime(booking.start_time)}-{formatTime(booking.end_time)}
+                  </span>
+                )}
+              </div>
+            );
+          })}
+
+        {/* 当前时间指示线 */}
+        {isToday && (
+          <div
+            className="absolute top-0 bottom-0 w-0.5 bg-blue-500 z-10"
+            style={{ left: `${(currentHours / 24) * 100}%` }}
+          />
+        )}
+      </div>
+
+      {/* 图例 */}
+      <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground mt-2">
+        {isToday && (
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded bg-gray-300" />
+            <span>已过</span>
+          </div>
+        )}
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-orange-400" />
+          <span>繁忙</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-4 h-4 rounded bg-green-100 border border-green-300" />
+          <span>空闲</span>
+        </div>
+        {isToday && (
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 bg-blue-500" />
+            <span>当前</span>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
 
 export default function BookingCalendar() {
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
-  
+
   const [meetingRoom, setMeetingRoom] = useState<MeetingRoom | null>(null);
   const [selectedDate, setSelectedDate] = useState<string>(formatDate(new Date()));
-  const [timeSlots, setTimeSlots] = useState<TimeSlot[]>([]);
+  const [existingBookings, setExistingBookings] = useState<MeetingRoomBooking[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isLoadingSlots, setIsLoadingSlots] = useState(false);
-  
+  const [isLoadingBookings, setIsLoadingBookings] = useState(false);
+
   // 预定对话框状态
   const [bookingDialogOpen, setBookingDialogOpen] = useState(false);
-  const [selectedStartTime, setSelectedStartTime] = useState<string>('');
-  const [selectedEndTime, setSelectedEndTime] = useState<string>('');
+  const [selectedStartTime, setSelectedStartTime] = useState<string>('09:00:00');
+  const [selectedEndTime, setSelectedEndTime] = useState<string>('10:00:00');
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // 时间选项
+  const timeOptions = generateTimeOptions();
 
   // 加载会议室信息
   useEffect(() => {
@@ -66,7 +228,7 @@ export default function BookingCalendar() {
     const fetchMeetingRoom = async () => {
       try {
         const rooms = await meetingRoomService.getList();
-        const found = rooms.find(r => r.id === parseInt(id));
+        const found = rooms.find((r) => r.id === parseInt(id));
         if (found) {
           setMeetingRoom(found);
         } else {
@@ -83,60 +245,97 @@ export default function BookingCalendar() {
     fetchMeetingRoom();
   }, [id, navigate]);
 
-  // 加载时间段可用情况
-  const fetchAvailability = useCallback(async () => {
+  // 加载预定情况
+  const fetchBookings = useCallback(async () => {
     if (!id) return;
-    
-    setIsLoadingSlots(true);
+
+    setIsLoadingBookings(true);
     try {
-      const data = await meetingRoomService.getAvailability(parseInt(id), selectedDate);
-      setTimeSlots(data);
+      // 直接获取预定列表
+      const bookings = await meetingRoomService.getBookings(
+        parseInt(id),
+        selectedDate
+      );
+      setExistingBookings(bookings || []);
     } catch {
-      // 如果API返回空，使用默认时间段
-      const defaultSlots = generateTimeSlots().map(slot => ({
-        start_time: slot.start,
-        end_time: slot.end,
-        is_available: true,
-      }));
-      setTimeSlots(defaultSlots);
+      setExistingBookings([]);
     } finally {
-      setIsLoadingSlots(false);
+      setIsLoadingBookings(false);
     }
   }, [id, selectedDate]);
 
-  // 当日期变化时加载可用时间段
+  // 当日期变化时加载预定情况
   useEffect(() => {
     if (meetingRoom) {
-      fetchAvailability();
+      fetchBookings();
     }
-  }, [meetingRoom, fetchAvailability]);
+  }, [meetingRoom, fetchBookings]);
 
   // 打开预定对话框
-  const openBookingDialog = (slot: TimeSlot) => {
-    if (!slot.is_available) {
-      toast.error('该时间段已被预定');
-      return;
-    }
-    setSelectedStartTime(slot.start_time);
-    setSelectedEndTime(slot.end_time);
+  const openBookingDialog = () => {
+    // 找到第一个可用的开始时间
+    const availableStartTime =
+      timeOptions.find(
+        (time) =>
+          time !== '24:00:00' &&
+          !isTimePassed(time, selectedDate) &&
+          !isTimeBooked(time, existingBookings)
+      ) || '09:00:00';
+
+    // 找到对应的结束时间（开始时间后1小时）
+    const startIndex = timeOptions.indexOf(availableStartTime);
+    const availableEndTime =
+      timeOptions[startIndex + 2] || timeOptions[startIndex + 1] || '10:00:00';
+
+    setSelectedStartTime(availableStartTime);
+    setSelectedEndTime(availableEndTime);
     setBookingDialogOpen(true);
   };
 
   // 提交预定
   const handleBooking = async () => {
     if (!id || !selectedStartTime || !selectedEndTime) return;
-    
+
+    // 验证时间
+    if (selectedStartTime >= selectedEndTime) {
+      toast.error('结束时间必须晚于开始时间');
+      return;
+    }
+
+    // 检查是否是过去的时间
+    if (isTimePassed(selectedStartTime, selectedDate)) {
+      toast.error('不能预定已过的时间');
+      return;
+    }
+
+    // 检查冲突
+    const conflict = checkTimeConflict(
+      selectedStartTime,
+      selectedEndTime,
+      existingBookings
+    );
+    if (conflict) {
+      toast.error(
+        `该时间段与已有预定冲突 (${formatTime(conflict.start_time)} - ${formatTime(conflict.end_time)})`
+      );
+      return;
+    }
+
     setIsSubmitting(true);
     try {
+      // 处理24:00:00的情况，转换为23:59:59
+      const endTime =
+        selectedEndTime === '24:00:00' ? '23:59:59' : selectedEndTime;
+
       await meetingRoomBookingService.create({
         meeting_room_id: parseInt(id),
         booking_date: selectedDate,
         start_time: selectedStartTime,
-        end_time: selectedEndTime,
+        end_time: endTime,
       });
       toast.success('预定成功');
       setBookingDialogOpen(false);
-      await fetchAvailability();
+      await fetchBookings();
     } catch (error: unknown) {
       const err = error as { response?: { data?: { message?: string } } };
       const message = err.response?.data?.message || '预定失败';
@@ -194,90 +393,141 @@ export default function BookingCalendar() {
             />
           </div>
 
-          {/* 时间段列表 */}
+          {/* 时间轴展示 */}
           <div>
-            <h3 className="text-sm font-medium mb-3">可用时间段</h3>
-            {isLoadingSlots ? (
+            <h3 className="text-sm font-medium mb-3">当日预定情况</h3>
+            {isLoadingBookings ? (
               <div className="text-center py-8 text-muted-foreground">
                 加载中...
               </div>
-            ) : timeSlots.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                暂无可用时间段
-              </div>
             ) : (
-              <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-6 gap-3">
-                {timeSlots.map((slot, index) => (
-                  <Button
-                    key={index}
-                    variant={slot.is_available ? 'outline' : 'secondary'}
-                    className={`h-auto py-3 flex flex-col items-center gap-1 ${
-                      slot.is_available 
-                        ? 'hover:bg-primary hover:text-primary-foreground cursor-pointer' 
-                        : 'opacity-50 cursor-not-allowed'
-                    }`}
-                    onClick={() => openBookingDialog(slot)}
-                    disabled={!slot.is_available}
-                  >
-                    <div className="flex items-center gap-1">
-                      <Clock className="w-3 h-3" />
-                      <span className="text-sm">
-                        {formatTime(slot.start_time)} - {formatTime(slot.end_time)}
-                      </span>
-                    </div>
-                    <Badge 
-                      variant="secondary" 
-                      className={slot.is_available 
-                        ? 'bg-green-100 text-green-700' 
-                        : 'bg-red-100 text-red-700'}
-                    >
-                      {slot.is_available ? (
-                        <><Check className="w-3 h-3 mr-1" />可预定</>
-                      ) : (
-                        <><X className="w-3 h-3 mr-1" />已预定</>
-                      )}
-                    </Badge>
-                  </Button>
-                ))}
-              </div>
+              <TimelineBar
+                bookings={existingBookings}
+                selectedDate={selectedDate}
+              />
             )}
           </div>
 
-          {/* 图例 */}
-          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-            <div className="flex items-center gap-1">
-              <div className="w-4 h-4 rounded bg-green-100 border border-green-300" />
-              <span>可预定</span>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="w-4 h-4 rounded bg-red-100 border border-red-300" />
-              <span>已预定</span>
-            </div>
+          {/* 预定按钮 */}
+          <div>
+            <Button onClick={openBookingDialog} className="w-full sm:w-auto">
+              <Plus className="w-4 h-4 mr-2" />
+              预定会议室
+            </Button>
           </div>
         </CardContent>
       </Card>
 
-      {/* 预定确认对话框 */}
+      {/* 预定对话框 */}
       <Dialog open={bookingDialogOpen} onOpenChange={setBookingDialogOpen}>
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>确认预定</DialogTitle>
-            <DialogDescription>
-              请确认以下预定信息
-            </DialogDescription>
+            <DialogTitle>预定会议室</DialogTitle>
+            <DialogDescription>选择预定时间段</DialogDescription>
           </DialogHeader>
-          <div className="py-4 space-y-2 text-sm">
-            <p><span className="font-medium">会议室：</span>{meetingRoom.name}</p>
-            <p><span className="font-medium">位置：</span>{meetingRoom.location}</p>
-            <p><span className="font-medium">容纳人数：</span>{meetingRoom.capacity} 人</p>
-            <p><span className="font-medium">预定日期：</span>{selectedDate}</p>
-            <p><span className="font-medium">时间段：</span>{formatTime(selectedStartTime)} - {formatTime(selectedEndTime)}</p>
+          <div className="py-4 space-y-4">
+            <div className="space-y-2 text-sm">
+              <p>
+                <span className="font-medium">会议室：</span>
+                {meetingRoom.name}
+              </p>
+              <p>
+                <span className="font-medium">位置：</span>
+                {meetingRoom.location}
+              </p>
+              <p>
+                <span className="font-medium">容纳人数：</span>
+                {meetingRoom.capacity} 人
+              </p>
+              <p>
+                <span className="font-medium">预定日期：</span>
+                {selectedDate}
+              </p>
+            </div>
+
+            {/* 时间选择 */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>开始时间</Label>
+                <Select
+                  value={selectedStartTime}
+                  onValueChange={setSelectedStartTime}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择开始时间" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeOptions.slice(0, -1)
+                      .filter((time) => {
+                        // 过滤掉已过和已预定的时间
+                        const isPassed = isTimePassed(time, selectedDate);
+                        const isBooked = isTimeBooked(time, existingBookings);
+                        return !isPassed && !isBooked;
+                      })
+                      .map((time) => (
+                        <SelectItem key={time} value={time}>
+                          {formatTime(time)}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+              <div className="space-y-2">
+                <Label>结束时间</Label>
+                <Select
+                  value={selectedEndTime}
+                  onValueChange={setSelectedEndTime}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="选择结束时间" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeOptions.slice(1)
+                      .filter((time) => {
+                        // 结束时间必须大于开始时间
+                        if (time <= selectedStartTime) return false;
+                        // 检查从开始时间到结束时间之间是否有冲突
+                        const hasConflict = checkTimeConflict(
+                          selectedStartTime,
+                          time,
+                          existingBookings
+                        );
+                        return !hasConflict;
+                      })
+                      .map((time) => (
+                        <SelectItem key={time} value={time}>
+                          {time === '24:00:00' ? '24:00' : formatTime(time)}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* 时间验证提示 */}
+            {selectedStartTime >= selectedEndTime && (
+              <p className="text-sm text-red-500">结束时间必须晚于开始时间</p>
+            )}
+            {selectedStartTime < selectedEndTime &&
+              checkTimeConflict(
+                selectedStartTime,
+                selectedEndTime,
+                existingBookings
+              ) && (
+                <p className="text-sm text-red-500">该时间段与已有预定冲突</p>
+              )}
           </div>
           <DialogFooter>
-            <Button variant="outline" onClick={() => setBookingDialogOpen(false)}>
+            <Button
+              variant="outline"
+              onClick={() => setBookingDialogOpen(false)}
+            >
               取消
             </Button>
-            <Button onClick={handleBooking} disabled={isSubmitting}>
+            <Button
+              onClick={handleBooking}
+              disabled={isSubmitting || selectedStartTime >= selectedEndTime}
+            >
               {isSubmitting ? '预定中...' : '确认预定'}
             </Button>
           </DialogFooter>

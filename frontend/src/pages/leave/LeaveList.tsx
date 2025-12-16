@@ -62,9 +62,10 @@ export default function LeaveList() {
   const fetchLeaves = useCallback(async () => {
     try {
       const data = await leaveService.getList();
-      setLeaves(data);
+      setLeaves(data || []);
     } catch {
       toast.error('获取请假记录失败');
+      setLeaves([]);
     }
   }, []);
 

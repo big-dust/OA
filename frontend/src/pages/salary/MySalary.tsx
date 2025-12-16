@@ -51,10 +51,11 @@ export default function MySalary() {
     try {
       const data = await salaryService.getMy();
       // 按月份降序排列（需求 3.1）
-      const sortedData = [...data].sort((a, b) => b.month.localeCompare(a.month));
+      const sortedData = [...(data || [])].sort((a, b) => b.month.localeCompare(a.month));
       setSalaries(sortedData);
     } catch {
       toast.error('获取工资记录失败');
+      setSalaries([]);
     }
   }, []);
 

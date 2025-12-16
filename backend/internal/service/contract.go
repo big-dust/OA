@@ -117,6 +117,12 @@ func (s *ContractService) generateContractContent(templateContent string, employ
 	content = strings.ReplaceAll(content, "{{hire_date}}", employee.HireDate.Format("2006-01-02"))
 	content = strings.ReplaceAll(content, "{{current_date}}", time.Now().Format("2006-01-02"))
 	
+	// Replace date placeholders for contract terms
+	// start_date uses hire_date for onboarding contracts
+	content = strings.ReplaceAll(content, "{{start_date}}", employee.HireDate.Format("2006-01-02"))
+	// end_date uses current date as default for offboarding contracts
+	content = strings.ReplaceAll(content, "{{end_date}}", time.Now().Format("2006-01-02"))
+	
 	return content
 }
 

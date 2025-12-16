@@ -75,9 +75,10 @@ export default function EmployeeList() {
     const fetchEmployees = async () => {
       try {
         const data = await employeeService.getList();
-        setEmployees(data);
+        setEmployees(data || []);
       } catch {
         toast.error('获取员工列表失败');
+        setEmployees([]);
       } finally {
         setIsLoading(false);
       }
@@ -126,7 +127,7 @@ export default function EmployeeList() {
       await employeeService.updateSupervisor(selectedEmployee.id, supervisorId);
       // 重新获取列表以获取完整的 supervisor 信息
       const data = await employeeService.getList();
-      setEmployees(data);
+      setEmployees(data || []);
       setSupervisorDialogOpen(false);
       toast.success('主管修改成功');
     } catch {

@@ -27,6 +27,45 @@ export interface TimeSlot {
   booking?: MeetingRoomBooking;
 }
 
+// 后端返回的可用性响应格式
+interface RoomAvailabilityResponse {
+  room: MeetingRoom;
+  bookings: MeetingRoomBooking[];
+}
+
+// 生成时间段（每小时一个，从 8:00 到 20:00）- 用于旧版兼容
+function generateTimeSlots(bookings: MeetingRoomBooking[]): TimeSlot[] {
+  const slots: TimeSlot[] = [];
+  for (let hour = 8; hour < 20; hour++) {
+    const startTime = `${hour.toString().padStart(2, '0')}:00:00`;
+    const endTime = `${(hour + 1).toString().padStart(2, '0')}:00:00`;
+    
+    // 检查该时间段是否有预定
+    const conflictBooking = bookings.find(b => {
+      // 只检查活跃状态的预定
+      if (b.status !== 'active') return false;
+      // 检查时间是否重叠
+      return b.start_time < endTime && b.end_time > startTime;
+    });
+    
+    slots.push({
+      start_time: startTime,
+      end_time: endTime,
+      is_available: !conflictBooking,
+      booking: conflictBooking,
+    });
+  }
+  return slots;
+}
+
+// 获取指定日期的所有预定
+async function getBookingsForDate(id: number, date: string): Promise<MeetingRoomBooking[]> {
+  const response = await api.get<RoomAvailabilityResponse>(`/meeting-rooms/${id}/availability`, {
+    params: { date },
+  });
+  return response.data?.bookings || [];
+}
+
 export const meetingRoomService = {
   // 获取会议室列表
   getList: async (): Promise<MeetingRoom[]> => {
@@ -51,12 +90,15 @@ export const meetingRoomService = {
     await api.delete(`/meeting-rooms/${id}`);
   },
 
-  // 获取可用时间段
+  // 获取可用时间段（旧版兼容）
   getAvailability: async (id: number, date: string): Promise<TimeSlot[]> => {
-    const response = await api.get<TimeSlot[]>(`/meeting-rooms/${id}/availability`, {
-      params: { date },
-    });
-    return response.data;
+    const bookings = await getBookingsForDate(id, date);
+    return generateTimeSlots(bookings);
+  },
+  
+  // 获取指定日期的所有预定（新版，直接返回预定列表）
+  getBookings: async (id: number, date: string): Promise<MeetingRoomBooking[]> => {
+    return getBookingsForDate(id, date);
   },
 };
 

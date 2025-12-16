@@ -17,7 +17,7 @@ import type { Device } from '@/types';
 const deviceSchema = z.object({
   name: z.string().min(1, '请输入设备名称'),
   type: z.string().min(1, '请输入设备类型'),
-  total_quantity: z.number().min(1, '数量必须大于0'),
+  quantity: z.number().min(1, '数量必须大于0'),
   description: z.string().optional(),
 });
 
@@ -37,7 +37,7 @@ export default function DeviceForm() {
     defaultValues: {
       name: '',
       type: '',
-      total_quantity: 1,
+      quantity: 1,
       description: '',
     },
   });
@@ -54,7 +54,7 @@ export default function DeviceForm() {
             form.reset({
               name: found.name,
               type: found.type,
-              total_quantity: found.total_quantity,
+              quantity: found.total_quantity,
               description: found.description || '',
             });
           } else {
@@ -80,7 +80,7 @@ export default function DeviceForm() {
         await deviceService.update(parseInt(id), {
           name: data.name,
           type: data.type,
-          total_quantity: data.total_quantity,
+          quantity: data.quantity,
           description: data.description || '',
         });
         toast.success('设备更新成功');
@@ -88,7 +88,7 @@ export default function DeviceForm() {
         await deviceService.create({
           name: data.name,
           type: data.type,
-          total_quantity: data.total_quantity,
+          quantity: data.quantity,
           description: data.description || '',
         });
         toast.success('设备创建成功');
@@ -158,7 +158,7 @@ export default function DeviceForm() {
               />
               <FormField
                 control={form.control}
-                name="total_quantity"
+                name="quantity"
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>数量 *</FormLabel>

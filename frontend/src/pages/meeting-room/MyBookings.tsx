@@ -60,9 +60,10 @@ export default function MyBookings() {
   const fetchBookings = useCallback(async () => {
     try {
       const data = await meetingRoomBookingService.getList();
-      setBookings(data);
+      setBookings(data || []);
     } catch {
       toast.error('获取预定记录失败');
+      setBookings([]);
     }
   }, []);
 

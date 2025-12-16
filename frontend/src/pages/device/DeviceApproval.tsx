@@ -51,9 +51,10 @@ export default function DeviceApproval() {
   const fetchPendingRequests = useCallback(async () => {
     try {
       const data = await deviceRequestService.getPending();
-      setPendingRequests(data);
+      setPendingRequests(data || []);
     } catch {
       toast.error('获取待审批申请失败');
+      setPendingRequests([]);
     }
   }, []);
 
@@ -61,9 +62,10 @@ export default function DeviceApproval() {
   const fetchReturnPendingRequests = useCallback(async () => {
     try {
       const data = await deviceRequestService.getReturnPending();
-      setReturnPendingRequests(data);
+      setReturnPendingRequests(data || []);
     } catch {
       toast.error('获取待确认归还申请失败');
+      setReturnPendingRequests([]);
     }
   }, []);
 
