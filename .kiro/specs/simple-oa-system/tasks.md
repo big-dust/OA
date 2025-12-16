@@ -1,0 +1,400 @@
+# 实现计划
+
+## 后端开发
+
+- [x] 1. 项目初始化和基础架构
+  - [x] 1.1 初始化 Go 项目结构
+    - 创建 backend 目录结构（cmd、internal、pkg、config、migrations）
+    - 初始化 go.mod，添加依赖（gin、gorm、mysql、jwt-go）
+    - _需求: 设计文档架构_
+  - [x] 1.2 实现配置管理
+    - 创建 config/config.go，支持环境变量和配置文件
+    - 配置数据库连接、JWT 密钥、服务端口等
+    - _需求: 设计文档架构_
+  - [x] 1.3 实现数据库连接和模型定义
+    - 创建 internal/model/models.go，定义所有实体模型
+    - 实现 GORM 自动迁移
+    - _需求: 设计文档数据模型_
+  - [x] 1.4 创建数据库初始化脚本
+    - 创建 migrations/init.sql
+    - 包含预设超级管理员账号（admin/admin123）
+    - 包含预设合同模板（入职/离职）
+    - _需求: 11.1, 9.1_
+
+- [x] 2. 认证模块
+
+  - [x] 2.1 实现 JWT 工具
+    - 创建 pkg/jwt/jwt.go
+    - 实现 token 生成和验证
+    - _需求: 1.5_
+  - [x] 2.2 实现认证中间件
+    - 创建 internal/middleware/auth.go
+    - 验证 JWT token
+    - 提取用户信息到上下文
+    - _需求: 1.5, 1.7_
+  - [x] 2.3 实现认证服务和处理器
+    - 创建 internal/service/auth.go 和 internal/handler/auth.go
+    - 实现登录接口（POST /api/auth/login）
+    - 实现修改密码接口（POST /api/auth/change-password）
+    - 处理首次登录标记
+    - _需求: 1.1-1.7_
+  - [ ]* 2.4 编写首次登录强制改密属性测试
+    - **Property 1: 首次登录强制改密**
+    - **验证: 需求 1.1, 1.2**
+  - [ ]* 2.5 编写登录认证属性测试
+    - **Property 2: 登录认证**
+    - **验证: 需求 1.5, 1.6, 1.7**
+
+- [x] 3. 权限控制模块
+  - [x] 3.1 实现 RBAC 中间件
+    - 创建 internal/middleware/rbac.go
+    - 定义角色权限映射
+    - 实现权限检查逻辑
+    - _需求: 12.1-12.7_
+  - [ ]* 3.2 编写权限控制属性测试
+    - **Property 17: 角色权限继承**
+    - **Property 18: 权限访问控制**
+    - **验证: 需求 12.1-12.7**
+
+- [x] 4. 员工模块
+  - [x] 4.1 实现员工仓储层
+    - 创建 internal/repository/employee.go
+    - 实现 CRUD 操作
+    - _需求: 2.1-2.3, 11.2-11.9_
+  - [x] 4.2 实现员工服务层
+    - 创建 internal/service/employee.go
+    - 实现员工创建（自动生成工号和密码）
+    - 实现员工信息更新（限制系统字段）
+    - 实现角色修改、主管修改、账号启用禁用
+    - _需求: 2.1-2.3, 11.2-11.9_
+  - [ ]* 4.3 编写员工工号唯一性属性测试
+    - **Property 16: 员工工号唯一性**
+    - **验证: 需求 11.3**
+  - [x] 4.4 实现员工处理器
+    - 创建 internal/handler/employee.go
+    - 实现所有员工相关 API 接口
+    - _需求: 2.1-2.3, 11.2-11.9_
+  - [ ]* 4.5 编写员工信息字段编辑限制属性测试
+    - **Property 3: 员工信息字段编辑限制**
+    - **验证: 需求 2.3**
+
+- [x] 5. Checkpoint - 确保所有测试通过
+  - 确保所有测试通过，如有问题请询问用户
+
+- [x] 6. 考勤模块
+  - [x] 6.1 实现考勤仓储层
+    - 创建 internal/repository/attendance.go
+    - 实现签到签退记录的 CRUD
+    - _需求: 4.1-4.5_
+  - [x] 6.2 实现考勤服务层
+    - 创建 internal/service/attendance.go
+    - 实现签到逻辑（检查重复签到）
+    - 实现签退逻辑（检查是否已签到）
+    - _需求: 4.1-4.5_
+  - [ ]* 6.3 编写签到幂等性属性测试
+    - **Property 6: 签到幂等性**
+    - **验证: 需求 4.1, 4.3**
+  - [ ]* 6.4 编写签退前置条件属性测试
+    - **Property 7: 签退前置条件**
+    - **验证: 需求 4.2, 4.4**
+  - [x] 6.5 实现考勤处理器
+    - 创建 internal/handler/attendance.go
+    - 实现所有考勤相关 API 接口
+    - _需求: 4.1-4.5_
+
+- [x] 7. 请假模块
+  - [x] 7.1 实现请假仓储层
+    - 创建 internal/repository/leave.go
+    - 实现请假申请的 CRUD
+    - _需求: 5.1-5.8_
+  - [x] 7.2 实现请假服务层
+    - 创建 internal/service/leave.go
+    - 实现请假申请创建
+    - 实现审批、拒绝、取消逻辑
+    - 实现状态机验证
+    - _需求: 5.1-5.8_
+  - [ ]* 7.3 编写请假申请状态机属性测试
+    - **Property 8: 请假申请状态机**
+    - **验证: 需求 5.3, 5.4, 5.7, 5.8**
+  - [ ]* 7.4 编写主管只能查看下属请假属性测试
+    - **Property 9: 主管只能查看下属请假**
+    - **验证: 需求 5.2**
+  - [x] 7.5 实现请假处理器
+    - 创建 internal/handler/leave.go
+    - 实现所有请假相关 API 接口
+    - _需求: 5.1-5.8_
+
+- [x] 8. 设备模块
+  - [x] 8.1 实现设备仓储层
+    - 创建 internal/repository/device.go
+    - 实现设备和设备申请的 CRUD
+    - _需求: 6.1-6.4, 7.1-7.10_
+  - [x] 8.2 实现设备服务层
+    - 创建 internal/service/device.go
+    - 实现设备管理（增删改查）
+    - 实现设备申请流程（申请、审批、领取、归还）
+    - 实现可用数量更新逻辑
+    - _需求: 6.1-6.4, 7.1-7.10_
+  - [ ]* 8.3 编写设备可用数量一致性属性测试
+    - **Property 10: 设备可用数量一致性**
+    - **验证: 需求 7.5, 7.7**
+  - [ ]* 8.4 编写设备申请状态机属性测试
+    - **Property 11: 设备申请状态机**
+    - **验证: 需求 7.3, 7.4, 7.5, 7.6, 7.7, 7.9, 7.10**
+  - [x] 8.5 实现设备处理器
+    - 创建 internal/handler/device.go
+    - 实现所有设备相关 API 接口
+    - _需求: 6.1-6.4, 7.1-7.10_
+
+- [ ] 9. Checkpoint - 确保所有测试通过
+  - 确保所有测试通过，如有问题请询问用户
+
+- [x] 10. 会议室模块
+  - [x] 10.1 实现会议室仓储层
+    - 创建 internal/repository/meeting_room.go
+    - 实现会议室和预定的 CRUD
+    - _需求: 8.1-8.11_
+  - [x] 10.2 实现会议室服务层
+    - 创建 internal/service/meeting_room.go
+    - 实现会议室管理（增删改查）
+    - 实现预定冲突检测
+    - 实现单预定限制检查
+    - _需求: 8.1-8.11_
+  - [ ]* 10.3 编写会议室预定冲突检测属性测试
+    - **Property 12: 会议室预定冲突检测**
+    - **验证: 需求 8.5, 8.6**
+  - [ ]* 10.4 编写员工单预定限制属性测试
+    - **Property 13: 员工单预定限制**
+    - **验证: 需求 8.8**
+  - [ ]* 10.5 编写会议室预定取消释放时间段属性测试
+    - **Property 14: 会议室预定取消释放时间段**
+    - **验证: 需求 8.11**
+  - [x] 10.6 实现会议室处理器
+    - 创建 internal/handler/meeting_room.go
+    - 实现所有会议室相关 API 接口
+    - _需求: 8.1-8.11_
+
+- [x] 11. 合同模块
+  - [x] 11.1 实现合同仓储层
+    - 创建 internal/repository/contract.go
+    - 实现合同模板和合同的 CRUD
+    - _需求: 9.1-9.5_
+  - [x] 11.2 实现合同服务层
+    - 创建 internal/service/contract.go
+    - 实现合同创建（基于模板生成内容）
+    - 实现合同签署
+    - _需求: 9.1-9.5_
+  - [x] 11.3 实现合同处理器
+    - 创建 internal/handler/contract.go
+    - 实现所有合同相关 API 接口
+    - _需求: 9.1-9.5_
+
+- [x] 12. 工资模块
+  - [x] 12.1 实现工资仓储层
+    - 创建 internal/repository/salary.go
+    - 实现工资记录的 CRUD
+    - _需求: 3.1-3.3, 10.1-10.3_
+  - [x] 12.2 实现工资服务层
+    - 创建 internal/service/salary.go
+    - 实现工资记录创建（检查重复）
+    - 实现工资记录查询（数据隔离）
+    - _需求: 3.1-3.3, 10.1-10.3_
+  - [ ]* 12.3 编写工资记录数据隔离属性测试
+    - **Property 4: 工资记录数据隔离**
+    - **验证: 需求 3.3**
+  - [ ]* 12.4 编写工资记录排序属性测试
+    - **Property 5: 工资记录排序**
+    - **验证: 需求 3.1**
+  - [ ]* 12.5 编写工资记录唯一性属性测试
+    - **Property 15: 工资记录唯一性**
+    - **验证: 需求 10.2**
+  - [x] 12.6 实现工资处理器
+    - 创建 internal/handler/salary.go
+    - 实现所有工资相关 API 接口
+    - _需求: 3.1-3.3, 10.1-10.3_
+
+- [x] 13. 后端路由整合和启动
+  - [x] 13.1 整合所有路由
+    - 创建 cmd/server/main.go
+    - 注册所有路由和中间件
+    - 实现优雅关闭
+    - _需求: 设计文档架构_
+
+- [ ] 14. Checkpoint - 确保所有测试通过
+  - 确保所有测试通过，如有问题请询问用户
+
+## 前端开发
+
+- [x] 15. 前端项目初始化
+  - [x] 15.1 创建 React 项目
+    - 使用 Vite 创建 React + TypeScript 项目
+    - 配置 Tailwind CSS v4
+    - 初始化 shadcn/ui
+    - _需求: 设计文档架构_
+  - [x] 15.2 配置项目基础设施
+    - 配置路由（react-router-dom）
+    - 配置 API 客户端（axios），包含 token 拦截器
+    - 配置状态管理（zustand）
+    - 创建类型定义文件（src/types/index.ts）
+    - _需求: 设计文档架构_
+  - [x] 15.3 创建 API 服务层
+    - 创建 src/services/api.ts（axios 实例）
+    - 创建 src/services/auth.ts（认证 API）
+    - 创建 src/services/employee.ts（员工 API）
+    - 创建 src/services/attendance.ts（考勤 API）
+    - 创建 src/services/leave.ts（请假 API）
+    - 创建 src/services/device.ts（设备 API）
+    - 创建 src/services/meetingRoom.ts（会议室 API）
+    - 创建 src/services/contract.ts（合同 API）
+    - 创建 src/services/salary.ts（工资 API）
+    - _需求: 设计文档架构_
+
+- [x] 16. 认证相关页面
+  - [x] 16.1 实现登录页面
+    - 创建 src/pages/auth/Login.tsx
+    - 实现登录表单和验证
+    - 处理首次登录重定向
+    - _需求: 1.1, 1.5, 1.6, 1.7_
+  - [x] 16.2 实现修改密码页面
+    - 创建 src/pages/auth/ChangePassword.tsx
+    - 实现密码修改表单和验证
+    - _需求: 1.2, 1.3, 1.4_
+  - [x] 16.3 实现权限路由组件
+    - 创建 src/components/PrivateRoute.tsx
+    - 实现认证检查和首次登录检查
+    - 实现角色权限检查
+    - _需求: 1.2, 12.1-12.7_
+  - [x] 16.4 实现布局组件
+    - 创建 src/components/Layout.tsx
+    - 实现导航菜单（根据角色显示不同菜单）
+    - _需求: 12.1-12.6_
+
+- [x] 17. 员工相关页面
+  - [x] 17.1 实现个人信息页面
+    - 创建 src/pages/employee/Profile.tsx
+    - 显示员工信息
+    - 实现可编辑字段的编辑功能
+    - _需求: 2.1, 2.2, 2.3_
+  - [x] 17.2 实现员工列表页面
+    - 创建 src/pages/employee/EmployeeList.tsx
+    - 显示员工列表
+    - 实现角色修改、主管修改、账号启用禁用操作
+    - _需求: 11.5, 11.7, 11.8, 11.9_
+  - [x] 17.3 实现员工表单页面
+    - 创建 src/pages/employee/EmployeeForm.tsx
+    - 实现添加员工表单
+    - 显示生成的账号密码
+    - _需求: 11.2, 11.3, 11.4_
+
+- [x] 18. 考勤相关页面
+  - [x] 18.1 实现考勤页面
+    - 创建 src/pages/attendance/Attendance.tsx
+    - 实现签到签退按钮
+    - 显示今日考勤状态
+    - 显示当月考勤记录
+    - _需求: 4.1-4.5_
+
+- [x] 19. 请假相关页面
+  - [x] 19.1 实现请假列表页面
+    - 创建 src/pages/leave/LeaveList.tsx
+    - 显示我的请假记录
+    - 实现取消功能
+    - _需求: 5.5, 5.6, 5.7_
+  - [x] 19.2 实现请假申请表单
+    - 创建 src/pages/leave/LeaveForm.tsx
+    - 实现请假申请表单
+    - _需求: 5.1_
+  - [x] 19.3 实现请假审批页面
+    - 创建 src/pages/leave/LeaveApproval.tsx
+    - 显示待审批申请列表
+    - 实现批准、拒绝、取消功能
+    - _需求: 5.2, 5.3, 5.4, 5.8_
+
+- [ ] 20. Checkpoint - 确保所有测试通过
+  - 确保所有测试通过，如有问题请询问用户
+
+- [x] 21. 设备相关页面
+  - [x] 21.1 实现设备列表页面
+    - 创建 src/pages/device/DeviceList.tsx
+    - 显示设备列表
+    - 实现设备管理功能（设备管理员）
+    - _需求: 6.1-6.4, 7.1_
+  - [x] 21.2 实现设备表单页面
+    - 创建 src/pages/device/DeviceForm.tsx
+    - 实现添加/编辑设备表单
+    - _需求: 6.1, 6.2_
+  - [x] 21.3 实现设备申请页面
+    - 创建 src/pages/device/DeviceRequest.tsx
+    - 显示我的设备申请记录
+    - 实现申请、领取、归还、取消功能
+    - _需求: 7.2, 7.5, 7.6, 7.8, 7.9_
+  - [x] 21.4 实现设备审批页面
+    - 创建 src/pages/device/DeviceApproval.tsx
+    - 显示待审批和待确认归还申请
+    - 实现批准、拒绝、确认归还、取消功能
+    - _需求: 7.3, 7.4, 7.7, 7.10_
+
+- [x] 22. 会议室相关页面
+  - [x] 22.1 实现会议室列表页面
+    - 创建 src/pages/meeting-room/MeetingRoomList.tsx
+    - 显示会议室列表
+    - 实现会议室管理功能（超级管理员）
+    - _需求: 8.1-8.3_
+  - [x] 22.2 实现会议室表单页面
+    - 创建 src/pages/meeting-room/MeetingRoomForm.tsx
+    - 实现添加/编辑会议室表单
+    - _需求: 8.1, 8.2_
+  - [x] 22.3 实现预定日历页面
+    - 创建 src/pages/meeting-room/BookingCalendar.tsx
+    - 显示会议室可用情况
+    - 实现预定功能
+    - _需求: 8.4, 8.5, 8.6, 8.7, 8.8_
+  - [x] 22.4 实现我的预定页面
+    - 创建 src/pages/meeting-room/MyBookings.tsx
+    - 显示我的预定记录
+    - 实现完成、取消功能
+    - _需求: 8.9, 8.10, 8.11_
+
+- [x] 23. 合同相关页面
+  - [x] 23.1 实现合同列表页面
+    - 创建 src/pages/contract/ContractList.tsx
+    - 显示所有合同（HR）
+    - _需求: 9.4_
+  - [x] 23.2 实现合同表单页面
+    - 创建 src/pages/contract/ContractForm.tsx
+    - 实现创建合同表单（选择模板和员工）
+    - _需求: 9.1_
+  - [x] 23.3 实现我的合同页面
+    - 创建 src/pages/contract/MyContracts.tsx
+    - 显示我的合同
+    - 实现签署功能
+    - _需求: 9.2, 9.3, 9.5_
+
+- [x] 24. 工资相关页面
+  - [x] 24.1 实现工资列表页面
+    - 创建 src/pages/salary/SalaryList.tsx
+    - 显示所有工资记录（财务）
+    - 实现筛选功能
+    - _需求: 10.3_
+  - [x] 24.2 实现工资表单页面
+    - 创建 src/pages/salary/SalaryForm.tsx
+    - 实现创建工资记录表单
+    - _需求: 10.1, 10.2_
+  - [x] 24.3 实现我的工资页面
+    - 创建 src/pages/salary/MySalary.tsx
+    - 显示我的工资记录（按月份降序）
+    - 显示工资详情
+    - _需求: 3.1, 3.2, 3.3_
+
+- [x] 25. 仪表盘和路由整合
+  - [x] 25.1 实现仪表盘页面
+    - 创建 src/pages/dashboard/Dashboard.tsx
+    - 显示快捷操作入口
+    - _需求: 设计文档架构_
+  - [x] 25.2 整合所有路由
+    - 配置 App.tsx 路由
+    - 实现权限路由保护
+    - _需求: 12.1-12.7_
+
+- [ ] 26. Final Checkpoint - 确保所有测试通过
+  - 确保所有测试通过，如有问题请询问用户
