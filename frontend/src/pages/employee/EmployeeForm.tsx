@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { ArrowLeft, Copy, Check } from 'lucide-react';
+import { ArrowLeft, Copy, Check, Search } from 'lucide-react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -74,6 +74,21 @@ export default function EmployeeForm() {
   const [initialPassword, setInitialPassword] = useState('');
   const [copiedUsername, setCopiedUsername] = useState(false);
   const [copiedPassword, setCopiedPassword] = useState(false);
+  
+  // 主管搜索
+  const [supervisorSearch, setSupervisorSearch] = useState('');
+  
+  // 过滤后的员工列表（用于主管选择）
+  const filteredEmployees = useMemo(() => {
+    if (!supervisorSearch.trim()) return employees;
+    const search = supervisorSearch.toLowerCase();
+    return employees.filter(
+      (emp) =>
+        emp.name.toLowerCase().includes(search) ||
+        emp.department.toLowerCase().includes(search) ||
+        emp.employee_no.toLowerCase().includes(search)
+    );
+  }, [employees, supervisorSearch]);
 
   const form = useForm<EmployeeFormValues>({
     resolver: zodResolver(employeeSchema),
@@ -285,12 +300,31 @@ export default function EmployeeForm() {
                           </SelectTrigger>
                         </FormControl>
                         <SelectContent>
+                          <div className="p-2 sticky top-0 bg-background">
+                            <div className="relative">
+                              <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+                              <Input
+                                placeholder="搜索姓名/部门/工号..."
+                                value={supervisorSearch}
+                                onChange={(e) => setSupervisorSearch(e.target.value)}
+                                className="pl-8"
+                                onClick={(e) => e.stopPropagation()}
+                                onKeyDown={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </div>
                           <SelectItem value="none">无主管</SelectItem>
-                          {employees.map((emp) => (
-                            <SelectItem key={emp.id} value={emp.id.toString()}>
-                              {emp.name} ({emp.department})
-                            </SelectItem>
-                          ))}
+                          {filteredEmployees.length === 0 ? (
+                            <div className="py-2 px-2 text-sm text-muted-foreground text-center">
+                              未找到匹配的员工
+                            </div>
+                          ) : (
+                            filteredEmployees.map((emp) => (
+                              <SelectItem key={emp.id} value={emp.id.toString()}>
+                                {emp.name} ({emp.department})
+                              </SelectItem>
+                            ))
+                          )}
                         </SelectContent>
                       </Select>
                       <FormMessage />

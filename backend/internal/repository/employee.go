@@ -158,3 +158,10 @@ func (r *EmployeeRepository) Count() (int64, error) {
 	err := r.db.Model(&model.Employee{}).Count(&count).Error
 	return count, err
 }
+
+// GetEmployeesWithoutSupervisor retrieves all employees who don't have a supervisor
+func (r *EmployeeRepository) GetEmployeesWithoutSupervisor() ([]model.Employee, error) {
+	var employees []model.Employee
+	err := r.db.Where("supervisor_id IS NULL AND is_active = ?", true).Find(&employees).Error
+	return employees, err
+}

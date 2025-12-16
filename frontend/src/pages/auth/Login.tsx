@@ -46,8 +46,18 @@ export default function Login() {
         navigate('/dashboard');
       }
     } catch (error: unknown) {
-      const err = error as { response?: { data?: { message?: string } } };
-      const message = err.response?.data?.message || '登录失败，请检查用户名和密码';
+      const err = error as { response?: { data?: { code?: string; message?: string } } };
+      const code = err.response?.data?.code;
+      let message = '登录失败，请检查用户名和密码';
+      
+      if (code === 'AUTH_INVALID_CREDENTIALS') {
+        message = '用户名或密码错误';
+      } else if (code === 'AUTH_ACCOUNT_DISABLED') {
+        message = '账号已被禁用，请联系管理员';
+      } else if (err.response?.data?.message) {
+        message = err.response.data.message;
+      }
+      
       toast.error(message);
     } finally {
       setIsLoading(false);

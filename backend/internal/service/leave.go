@@ -36,10 +36,10 @@ func NewLeaveService(db *gorm.DB) *LeaveService {
 
 // CreateLeaveRequest represents the request to create a leave
 type CreateLeaveRequest struct {
-	LeaveType string    `json:"leave_type" binding:"required"`
-	StartDate time.Time `json:"start_date" binding:"required"`
-	EndDate   time.Time `json:"end_date" binding:"required"`
-	Reason    string    `json:"reason"`
+	LeaveType string `json:"leave_type" binding:"required"`
+	StartDate string `json:"start_date" binding:"required"`
+	EndDate   string `json:"end_date" binding:"required"`
+	Reason    string `json:"reason"`
 }
 
 // RejectLeaveRequest represents the request to reject a leave
@@ -51,8 +51,18 @@ type RejectLeaveRequest struct {
 // Create creates a new leave request
 // Implements Requirement 5.1: Employee submits leave request with type, dates, and reason
 func (s *LeaveService) Create(employeeID uint, req *CreateLeaveRequest) (*model.LeaveRequest, error) {
+	// Parse date strings
+	startDate, err := time.Parse("2006-01-02", req.StartDate)
+	if err != nil {
+		return nil, errors.New("invalid start date format, expected YYYY-MM-DD")
+	}
+	endDate, err := time.Parse("2006-01-02", req.EndDate)
+	if err != nil {
+		return nil, errors.New("invalid end date format, expected YYYY-MM-DD")
+	}
+
 	// Validate date range
-	if req.EndDate.Before(req.StartDate) {
+	if endDate.Before(startDate) {
 		return nil, ErrLeaveInvalidDateRange
 	}
 
@@ -61,13 +71,25 @@ func (s *LeaveService) Create(employeeID uint, req *CreateLeaveRequest) (*model.
 		return nil, errors.New("invalid leave type")
 	}
 
+	// Check if the employee is a super admin
+	employee, err := s.employeeRepo.GetByID(employeeID)
+	if err != nil {
+		return nil, err
+	}
+
+	// Super admin's leave requests are auto-approved
+	status := model.LeaveStatusPending
+	if employee.Role == model.RoleSuperAdmin {
+		status = model.LeaveStatusApproved
+	}
+
 	leave := &model.LeaveRequest{
 		EmployeeID: employeeID,
 		LeaveType:  req.LeaveType,
-		StartDate:  req.StartDate,
-		EndDate:    req.EndDate,
+		StartDate:  startDate,
+		EndDate:    endDate,
 		Reason:     req.Reason,
-		Status:     model.LeaveStatusPending,
+		Status:     status,
 	}
 
 	if err := s.leaveRepo.Create(leave); err != nil {
@@ -99,7 +121,14 @@ func (s *LeaveService) GetMyLeaves(employeeID uint) ([]model.LeaveRequest, error
 
 // GetPendingForSupervisor retrieves all pending leave requests from subordinates
 // Implements Property 9: 主管只能查看下属请假 - Supervisor can only view subordinates' leaves
+// Super admin can also see leave requests from employees without a supervisor
 func (s *LeaveService) GetPendingForSupervisor(supervisorID uint) ([]model.LeaveRequest, error) {
+	// Check if the current user is a super admin
+	supervisor, err := s.employeeRepo.GetByID(supervisorID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Get all subordinates
 	subordinates, err := s.employeeRepo.GetSubordinates(supervisorID)
 	if err != nil {
@@ -112,6 +141,20 @@ func (s *LeaveService) GetPendingForSupervisor(supervisorID uint) ([]model.Leave
 		subordinateIDs[i] = sub.ID
 	}
 
+	// If super admin, also include employees without a supervisor
+	if supervisor.Role == model.RoleSuperAdmin {
+		employeesWithoutSupervisor, err := s.employeeRepo.GetEmployeesWithoutSupervisor()
+		if err != nil {
+			return nil, err
+		}
+		for _, emp := range employeesWithoutSupervisor {
+			// Don't include self
+			if emp.ID != supervisorID {
+				subordinateIDs = append(subordinateIDs, emp.ID)
+			}
+		}
+	}
+
 	// Get pending leave requests from subordinates only (Property 9)
 	return s.leaveRepo.GetPendingBySubordinates(subordinateIDs)
 }
@@ -120,6 +163,7 @@ func (s *LeaveService) GetPendingForSupervisor(supervisorID uint) ([]model.Leave
 // Approve approves a leave request
 // Implements Property 8: 请假申请状态机 - Status transitions: pending → approved
 // Implements Requirement 5.3: Supervisor approves leave request
+// Super admin can approve leave requests from employees without a supervisor
 func (s *LeaveService) Approve(leaveID uint, supervisorID uint) (*model.LeaveRequest, error) {
 	leave, err := s.leaveRepo.GetByID(leaveID)
 	if err != nil {
@@ -134,12 +178,23 @@ func (s *LeaveService) Approve(leaveID uint, supervisorID uint) (*model.LeaveReq
 		return nil, ErrLeaveSelfApproval
 	}
 
+	// Get the approver info
+	approver, err := s.employeeRepo.GetByID(supervisorID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Verify the employee is a subordinate of the supervisor (Property 9)
 	employee, err := s.employeeRepo.GetByID(leave.EmployeeID)
 	if err != nil {
 		return nil, err
 	}
-	if employee.SupervisorID == nil || *employee.SupervisorID != supervisorID {
+
+	// Check authorization: either direct supervisor or super admin for employees without supervisor
+	isDirectSupervisor := employee.SupervisorID != nil && *employee.SupervisorID == supervisorID
+	isSuperAdminForOrphan := approver.Role == model.RoleSuperAdmin && employee.SupervisorID == nil
+
+	if !isDirectSupervisor && !isSuperAdminForOrphan {
 		return nil, ErrLeaveNotSubordinate
 	}
 
@@ -161,6 +216,7 @@ func (s *LeaveService) Approve(leaveID uint, supervisorID uint) (*model.LeaveReq
 // Reject rejects a leave request
 // Implements Property 8: 请假申请状态机 - Status transitions: pending → rejected
 // Implements Requirement 5.4: Supervisor rejects leave request with reason
+// Super admin can reject leave requests from employees without a supervisor
 func (s *LeaveService) Reject(leaveID uint, supervisorID uint, reason string) (*model.LeaveRequest, error) {
 	leave, err := s.leaveRepo.GetByID(leaveID)
 	if err != nil {
@@ -175,12 +231,23 @@ func (s *LeaveService) Reject(leaveID uint, supervisorID uint, reason string) (*
 		return nil, ErrLeaveSelfApproval
 	}
 
+	// Get the approver info
+	approver, err := s.employeeRepo.GetByID(supervisorID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Verify the employee is a subordinate of the supervisor (Property 9)
 	employee, err := s.employeeRepo.GetByID(leave.EmployeeID)
 	if err != nil {
 		return nil, err
 	}
-	if employee.SupervisorID == nil || *employee.SupervisorID != supervisorID {
+
+	// Check authorization: either direct supervisor or super admin for employees without supervisor
+	isDirectSupervisor := employee.SupervisorID != nil && *employee.SupervisorID == supervisorID
+	isSuperAdminForOrphan := approver.Role == model.RoleSuperAdmin && employee.SupervisorID == nil
+
+	if !isDirectSupervisor && !isSuperAdminForOrphan {
 		return nil, ErrLeaveNotSubordinate
 	}
 
@@ -236,6 +303,7 @@ func (s *LeaveService) CancelByEmployee(leaveID uint, employeeID uint) (*model.L
 // CancelBySupervisor cancels a leave request by the supervisor
 // Implements Property 8: 请假申请状态机 - Status transitions: pending → cancelled
 // Implements Requirement 5.8: Supervisor cancels pending leave request
+// Super admin can cancel leave requests from employees without a supervisor
 func (s *LeaveService) CancelBySupervisor(leaveID uint, supervisorID uint) (*model.LeaveRequest, error) {
 	leave, err := s.leaveRepo.GetByID(leaveID)
 	if err != nil {
@@ -245,12 +313,23 @@ func (s *LeaveService) CancelBySupervisor(leaveID uint, supervisorID uint) (*mod
 		return nil, err
 	}
 
+	// Get the approver info
+	approver, err := s.employeeRepo.GetByID(supervisorID)
+	if err != nil {
+		return nil, err
+	}
+
 	// Verify the employee is a subordinate of the supervisor (Property 9)
 	employee, err := s.employeeRepo.GetByID(leave.EmployeeID)
 	if err != nil {
 		return nil, err
 	}
-	if employee.SupervisorID == nil || *employee.SupervisorID != supervisorID {
+
+	// Check authorization: either direct supervisor or super admin for employees without supervisor
+	isDirectSupervisor := employee.SupervisorID != nil && *employee.SupervisorID == supervisorID
+	isSuperAdminForOrphan := approver.Role == model.RoleSuperAdmin && employee.SupervisorID == nil
+
+	if !isDirectSupervisor && !isSuperAdminForOrphan {
 		return nil, ErrLeaveNotSubordinate
 	}
 

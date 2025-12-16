@@ -27,7 +27,10 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error: AxiosError) => {
-    if (error.response?.status === 401) {
+    // 排除登录接口的 401 错误，登录失败不应该触发重定向
+    const isLoginRequest = error.config?.url === '/auth/login';
+    
+    if (error.response?.status === 401 && !isLoginRequest) {
       // Token 过期或无效，清除认证状态
       useAuthStore.getState().logout();
       window.location.href = '/login';

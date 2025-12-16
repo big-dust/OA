@@ -77,9 +77,9 @@ export default function Layout() {
   const isActive = (path: string) => location.pathname === path;
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-gray-50 flex">
       {/* 移动端顶部导航 */}
-      <div className="lg:hidden bg-white border-b px-4 py-3 flex items-center justify-between">
+      <div className="lg:hidden fixed top-0 left-0 right-0 bg-white border-b px-4 py-3 flex items-center justify-between z-30">
         <Button variant="ghost" size="icon" onClick={() => setSidebarOpen(true)}>
           <Menu className="w-6 h-6" />
         </Button>
@@ -98,7 +98,7 @@ export default function Layout() {
       {/* 侧边栏 */}
       <aside className={`
         fixed top-0 left-0 z-50 h-full w-64 bg-white border-r transform transition-transform duration-200
-        lg:translate-x-0 lg:static lg:z-auto
+        lg:translate-x-0
         ${sidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="flex flex-col h-full">
@@ -160,7 +160,7 @@ export default function Layout() {
       </aside>
 
       {/* 主内容区 */}
-      <main className="lg:ml-64 min-h-screen">
+      <main className="flex-1 lg:ml-64 min-h-screen pt-14 lg:pt-0">
         <div className="p-6">
           <Outlet />
         </div>
